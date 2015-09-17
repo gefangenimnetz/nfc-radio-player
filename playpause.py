@@ -1,6 +1,10 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import RPi.GPIO as GPIO
 import subprocess
 import time
+import json
 
 # set numbering to chipset type
 GPIO.setmode(GPIO.BCM)
@@ -56,6 +60,15 @@ def prev(channel):
     mpc_output = subprocess.check_output(['mpc', 'prev'])
     led_blink(2)
 
+def playViaMPD(command):
+    print('will play ' + command)
+    subprocess.call(['mpc', 'clear'])
+    subprocess.check_output('mpc ls "' + command + '" | mpc add', shell=True)
+    subprocess.call(['mpc', 'play'])
+
+def playViaSPOP(command):
+    print(command)
+
 # Detect button events
 GPIO.add_event_detect(INPUT_button_playPause, GPIO.RISING, callback=toggle_play_pause, bouncetime=500)
 GPIO.add_event_detect(INPUT_button_stop, GPIO.RISING, callback=stop, bouncetime=500)
@@ -64,11 +77,34 @@ GPIO.add_event_detect(INPUT_button_prev, GPIO.RISING, callback=prev, bouncetime=
 
 try:
 
-    #Initially set playing LED
+    # Initially set playing LED
     GPIO.output(OUTPUT_led_playing, is_mpd_currently_playing())
 
+    # This needs to bee the real tag's NDEF data later
+    raw_input("Press Enter to select an album ...")
+    tagPlayInfo = '{ "source": "usb", "url": "Ritter Rost Und Die Räuber" }'
+    tagPlayInfo = json.loads(tagPlayInfo)
+
+    command = None
+    service = None
+
+    if tagPlayInfo['source'] == 'usb':
+        service = 'mpd'
+        command = 'USB/' + tagPlayInfo['url']
+    if tagPlayInfo['source'] == 'playlist':
+        service = 'mpd'
+        command = 'USB/' + tagPlayInfo['url']
+    if tagPlayInfo['source'] == 'spotify':
+        service = 'spop'
+        command = tagPlayInfo['url']
+
+    if service == 'mpd':
+        playViaMPD(command)
+    if service == 'spop':
+        playViaSPOP(command)
+
     while True:
-        #We will do the NFC polling here
+        # We will do the NFC polling here
         time.sleep(1)
 except (KeyboardInterrupt, SystemExit):
     print 'keyboardinterrupt caught'
