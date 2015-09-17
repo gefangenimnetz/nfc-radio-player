@@ -19,4 +19,4 @@ Are JSON formatted and contain one root element with a `source` of type `usb | s
 - [ ] Find power supply: one powerplug for two voltages: 5V for Raspberry, 12V for amplififer board
 - [ ] Play spotify sources (via SPOP)
 - [ ] Built casing
-- [ ] UI to write to tags (select source, input url, click write button and add tag to reader/writer) probably even with easy uplod directly to the player (USB)
+- [ ] UI to write to tags (select source, input url, click write button and add tag to reader/writer) probably even with easy upload directly to the player (USB)
