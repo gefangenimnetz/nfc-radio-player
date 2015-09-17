@@ -2,6 +2,7 @@
 A raspberry pi based LoFi audio player using Volumio (raspberry image) and a PN532 breakout board
 
 # NFC Tags
+NDEF is used to store and read relevent infos from the tags. At this time no authorization or encryption is used at all.
 Are JSON formatted and contain one root element with a `source` of type `usb | spotify | playlist` and the source `url`.
 ```
 {
