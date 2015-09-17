@@ -14,9 +14,9 @@ Are JSON formatted and contain one root element with a `source` of type `usb | s
 # Todo
 - [x] Control MPD via buttons
 - [ ] Implement NFC Tag reading via polling (JSON)
-- [ ] Purge play queue and play selected album/title/playlist
-- [ ] Connect amplifier via I²C and set volume
-    - Problem: There are two volumes; Volumio (mpd audio out) and the amplifier’s. Which one to set?
+- [x] Purge play queue and play selected album/title/playlist
+- [ ] Change amplifier volume direcly in analog mode via poti.
+    - Problem: Volumio WebUI will allow to change volume of Raspberry Pi (ignore for now!)
 - [ ] Find power supply: one powerplug for two voltages: 5V for Raspberry, 12V for amplififer board
 - [ ] Play spotify sources (via SPOP)
 - [ ] Built casing
