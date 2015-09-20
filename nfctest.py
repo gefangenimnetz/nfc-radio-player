@@ -2,22 +2,45 @@ import nfc
 import nfc.ndef
 import nfc.clf
 
-import time
+import logging
+from observable import Observable
 
-def on_connect(tag):
-    if tag.ndef:
-        record = tag.ndef.message[0]
-        if record.type == "urn:nfc:wkt:T":
-            textContent = nfc.ndef.TextRecord(record).text
-            print(textContent)
+class ReadWriteTag(Observable):
+    "Exposes methods to read and write the NDEF sector of a NFC tag. Duh!"
+
+    def __init__(self):
+        self.reader_path = "tty:AMA0:pn532"
+        self.ndef_data = None
+
+    def __on_rdwr_startup(self, targets):
+        return targets
+
+    def __on_rdwr_connect(self, tag):
+        if tag.ndef:
+            record = tag.ndef.message[0]
+            if record.type == "urn:nfc:wkt:T":
+                ndef_text = nfc.ndef.TextRecord(record).text
+                self.ndef_data = ndef_text
+                self.trigger("ndef_data_read", ndef_text)
+            else:
+                logging.warning('NDEF data not of type "urn:nfc:wkt:T" (text)')
         else:
-            print("Not a text record")
-    else:
-        print('no ndef found')
+            logging.info('No NDEF data found')
+        return True # Wait until the tag has been removed
 
-rdwr_options = {
-    'on-connect': on_connect
-}
+    def run_once(self):
+        clf = nfc.ContactlessFrontend(self.reader_path)
+        try:
+            return clf.connect(rdwr={
+                'on-startup': self.__on_rdwr_startup,
+                'on-connect': self.__on_rdwr_connect,
+            })
+        finally:
+            clf.close()
 
-with nfc.ContactlessFrontend('tty:AMA0:pn532') as clf:
-    tag = clf.connect(rdwr=rdwr_options)
+    def run_infinite(self):
+        while self.run_once():
+            logging.info('--- Ready to read another tag ---')
+
+if __name__ == '__main__':
+    reader = ReadWriteTag().run_infinite()
