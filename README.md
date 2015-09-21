@@ -22,4 +22,5 @@ Are JSON formatted and contain one root element with a `source` of type `usb | s
 - [ ] Play directory vs single file. Automatic detection: `os.path.isfile("file.mp3") / os.path.isdir(folder)`
 - [ ] Play spotify sources (via SPOP)
 - [ ] Built case
+- [ ] Solder to case using protoboard
 - [ ] UI to write to tags (select source, input url, click write button and add tag to reader/writer) probably even with easy upload directly to the player (USB)
