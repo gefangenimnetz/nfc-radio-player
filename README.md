@@ -13,11 +13,12 @@ Are JSON formatted and contain one root element with a `source` of type `usb | s
 
 # Todo
 - [x] Control MPD via buttons
-- [ ] Implement NFC Tag reading via polling (JSON)
+- [x] Implement NFC Tag reading via polling (JSON)
 - [x] Purge play queue and play selected album/title/playlist
-- [ ] Change amplifier volume direcly in analog mode via poti.
+- [x] Change amplifier volume direcly in analog mode via poti.
     - Problem: Volumio WebUI will allow to change volume of Raspberry Pi (ignore for now!)
-- [ ] Find power supply: one powerplug for two voltages: 5V for Raspberry, 12V for amplififer board
+- [x] Find power supply: one powerplug for two voltages: 5V for Raspberry, 5V for amplififer board
+- [ ] Find a way to switch power supply from mains to 6xAA. Best if this can happen automatically.
 - [ ] Play spotify sources (via SPOP)
-- [ ] Built casing
+- [ ] Built case
 - [ ] UI to write to tags (select source, input url, click write button and add tag to reader/writer) probably even with easy upload directly to the player (USB)
