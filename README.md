@@ -19,7 +19,7 @@ JSON formatted and contain one root element with a `source` of type `usb | spoti
 - [x] Change amplifier volume direcly in analog mode via poti.
     - Problem: Volumio WebUI will allow to change volume of Raspberry Pi (ignore for now!)
 - [x] Find power supply: one powerplug for two voltages: 5V for Raspberry, 5V for amplififer board
-- [ ] Find a way to switch power supply from mains to 6xAA. Best if this can happen automatically.
+- [ ] Find a way to switch power supply from mains to 6xAA or 6xC (baby cell). Best if this can happen automatically.
 - [ ] Play spotify sources (via SPOP)
 - [ ] Built case
 - [ ] Solder to case using protoboard
