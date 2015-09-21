@@ -44,7 +44,7 @@ Build instructions will be written soon.
 ##Raspberry Pi Battery and UPS Add-ons
 There are a couple of systems that may be viable to use for the robot, these are currently being written.
 
-###MoPi
+###[MoPi](http://pi.gate.ac.uk/mopi/)
 #### >= £24 (£24 for the board + batteries, solar panels, wind turbines, ...)
 MoPi is mobile and 24/7 power for the Pi. On your bike, up a tree, or for your
 home server:
@@ -57,8 +57,6 @@ home server:
 * UPS (uninterruptible power) when using both batteries and mains
 * on-board LED indicators and on-Pi notifications
 
-And it even fits in the Pibow...  More at http://kck.st/1gK5U3t or
-http://pi.gate.ac.uk/mopi/
-
 ###<a href="http://cpc.farnell.com/jsp/level5/module.jsp?moduleId=cpc/690512.xml" target="_blank">PiUPS</a> ~ £28 (£24 Board + 6 batteries required)
-To be written.
+
+###[PiUSV](http://www.piusv.de/)
