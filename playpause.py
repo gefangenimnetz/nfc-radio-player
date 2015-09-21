@@ -5,12 +5,15 @@ import RPi.GPIO as GPIO
 import subprocess
 import time
 import json
+import logging
+import os
+
+import nfctest
 
 # set numbering to chipset type
 GPIO.setmode(GPIO.BCM)
 
-# Buttons (GPIO inputs)
-# "real" pull-down resistors in place
+# Buttons (GPIO inputs) "real" pull-down resistors should be in place
 INPUT_button_playPause = 9
 INPUT_button_stop = 25
 INPUT_button_next = 11
@@ -24,6 +27,8 @@ GPIO.setup(INPUT_button_prev, GPIO.IN)
 # LED output pins
 OUTPUT_led_playing = 4
 GPIO.setup(OUTPUT_led_playing, GPIO.OUT)
+
+mpd_music_library_path = '/var/lib/mpd/music/'
 
 def led_blink(amount):
     # for amount ...
@@ -39,6 +44,12 @@ def is_mpd_currently_playing():
     mpc_output = subprocess.check_output(['mpc', 'status'])
     playingString = '[playing]'
     return playingString in mpc_output
+
+def get_mpd_vol_as_int():
+    mpc_output = subprocess.check_output(['mpc', 'volume'])
+    vol = mpc_output.replace('volume: ', '')
+    vol = vol.replace('%', '')
+    return vol
 
 def toggle_play_pause(channel):
     print('play/pause')
@@ -61,7 +72,6 @@ def prev(channel):
     led_blink(2)
 
 def playViaMPD(command):
-    print('will play ' + command)
     subprocess.call(['mpc', 'clear'])
     subprocess.check_output('mpc ls "' + command + '" | mpc add', shell=True)
     subprocess.call(['mpc', 'play'])
@@ -69,22 +79,8 @@ def playViaMPD(command):
 def playViaSPOP(command):
     print(command)
 
-# Detect button events
-GPIO.add_event_detect(INPUT_button_playPause, GPIO.RISING, callback=toggle_play_pause, bouncetime=500)
-GPIO.add_event_detect(INPUT_button_stop, GPIO.RISING, callback=stop, bouncetime=500)
-GPIO.add_event_detect(INPUT_button_next, GPIO.RISING, callback=next, bouncetime=200)
-GPIO.add_event_detect(INPUT_button_prev, GPIO.RISING, callback=prev, bouncetime=200)
-
-try:
-
-    # Initially set playing LED
-    GPIO.output(OUTPUT_led_playing, is_mpd_currently_playing())
-
-    # This needs to bee the real tag's NDEF data later
-    raw_input("Press Enter to select an album ...")
-    tagPlayInfo = '{ "source": "usb", "url": "Ritter Rost Und Die Räuber" }'
-    tagPlayInfo = json.loads(tagPlayInfo)
-
+def parse_ndef(ndef):
+    tagPlayInfo = json.loads(ndef)
     command = None
     service = None
 
@@ -98,16 +94,36 @@ try:
         service = 'spop'
         command = tagPlayInfo['url']
 
-    if service == 'mpd':
-        playViaMPD(command)
-    if service == 'spop':
-        playViaSPOP(command)
+    fullCommandPath = mpd_music_library_path + 'd/' + command
+    if os.path.isdir(fullCommandPath) or os.path.isfile(fullCommandPath):
+        if service == 'mpd':
+            playViaMPD(command)
+        if service == 'spop':
+            playViaSPOP(command)
+    else:
+        mpc_output = subprocess.check_output(['mpc', 'pause'])
+        time.sleep(0.5)
+        subprocess.call('mpg123 -q sounds/not_found.mp3', shell=True)
+        time.sleep(0.5)
+        mpc_output = subprocess.check_output(['mpc', 'play'])
 
-    while True:
-        # We will do the NFC polling here
-        time.sleep(1)
-except (KeyboardInterrupt, SystemExit):
-    print 'keyboardinterrupt caught'
-    GPIO.output(OUTPUT_led_playing, GPIO.LOW)
-    GPIO.cleanup()
-    subprocess.call(['mpc', 'stop'])
+# Detect button events
+GPIO.add_event_detect(INPUT_button_playPause, GPIO.RISING, callback=toggle_play_pause, bouncetime=500)
+GPIO.add_event_detect(INPUT_button_stop, GPIO.RISING, callback=stop, bouncetime=500)
+GPIO.add_event_detect(INPUT_button_next, GPIO.RISING, callback=next, bouncetime=200)
+GPIO.add_event_detect(INPUT_button_prev, GPIO.RISING, callback=prev, bouncetime=200)
+
+# Initially set playing LED
+GPIO.output(OUTPUT_led_playing, is_mpd_currently_playing())
+
+reader = nfctest.ReadWriteTag()
+reader.on("ndef_data_read", parse_ndef)
+
+while reader.run_once():
+    logging.info('Waiting for NFC tags')
+
+# Exiting
+logging.info('Exit')
+GPIO.output(OUTPUT_led_playing, GPIO.LOW)
+GPIO.cleanup()
+subprocess.call(['mpc', 'stop'])
