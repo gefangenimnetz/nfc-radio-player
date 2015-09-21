@@ -19,6 +19,7 @@ Are JSON formatted and contain one root element with a `source` of type `usb | s
     - Problem: Volumio WebUI will allow to change volume of Raspberry Pi (ignore for now!)
 - [x] Find power supply: one powerplug for two voltages: 5V for Raspberry, 5V for amplififer board
 - [ ] Find a way to switch power supply from mains to 6xAA. Best if this can happen automatically.
+- [ ] Play directory vs single file. Automatic detection: `os.path.isfile("file.mp3") / os.path.isdir(folder)`
 - [ ] Play spotify sources (via SPOP)
 - [ ] Built case
 - [ ] UI to write to tags (select source, input url, click write button and add tag to reader/writer) probably even with easy upload directly to the player (USB)
