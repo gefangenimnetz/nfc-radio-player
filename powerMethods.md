@@ -1,12 +1,5 @@
 forked from https://github.com/RyanteckLTD/RTK-000-003/blob/master/handyTipsGuides/powerMethods.md
 
-#Power Methods for your Raspberry Pi
-The budget robotics kit and RTK-000-001 do not come with any electronics to power the Raspberry Pi, the reason why is from where it is highly not recommended to power both Motors & Pi from the same power source due to possible issues which can corrupt the SD card or even damage the Pi itself. There is also a lot of extra paperwork and other work needed to be able to send out a power supply with it and can also be denied to post to some countries which is why we do not include a powerbank.
-
-To power the motors you will need 4 AA batteries of either rechargable or non rechargable, non rechargables provide a little bit extra voltage making the motors move slightly faster but are not environmentally friendly and can cost more in the long term than rechargables.
-
-***Here is our list of power choices for the Raspberry Pi***
-
 ##USB Battery Bank / Emergency Phone Bank
 ####Between £10-15 for a normal one, £20+ for extra capacity. Recommended
 
