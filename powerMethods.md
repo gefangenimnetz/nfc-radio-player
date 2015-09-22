@@ -57,8 +57,6 @@ home server:
 * UPS (uninterruptible power) when using both batteries and mains
 * on-board LED indicators and on-Pi notifications
 
-###<a href="http://cpc.farnell.com/jsp/level5/module.jsp?moduleId=cpc/690512.xml" target="_blank">PiUPS</a> ~ £28 (£24 Board + 6 batteries required)
-
 ###[PiUSV](http://www.piusv.de/)
 
 ##[UPS Pico](http://www.modmypi.com/raspberry-pi/breakout-boards/pi-modules/ups-pico)
