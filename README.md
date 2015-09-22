@@ -15,7 +15,7 @@ JSON formatted and contain one root element with a `source` of type `usb | spoti
 - [x] Control MPD via buttons
 - [x] Implement NFC Tag reading via polling (JSON)
 - [x] Purge play queue and play selected folder/file
-- [ ] Play directory vs single file. Automatic detection: `os.path.isfile("file.mp3") / os.path.isdir(folder)`
+- [x] Play directories and single files.
 - [x] Change amplifier volume direcly in analog mode via poti.
     - Problem: Volumio WebUI will allow to change volume of Raspberry Pi (ignore for now!)
 - [x] Find power supply: one powerplug for two voltages: 5V for Raspberry, 5V for amplififer board
