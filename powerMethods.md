@@ -59,4 +59,6 @@ home server:
 
 ###[PiUSV](http://www.piusv.de/)
 
-##[UPS Pico](http://www.modmypi.com/raspberry-pi/breakout-boards/pi-modules/ups-pico)
+###[UPS Pico](http://www.modmypi.com/raspberry-pi/breakout-boards/pi-modules/ups-pico)
+
+###[S-USV](http://www.s-usv.de/)
