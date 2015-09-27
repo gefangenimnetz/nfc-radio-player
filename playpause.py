@@ -9,6 +9,7 @@ import logging
 import os
 
 import nfctest
+from bottle import Bottle, run, get, post, request, template
 
 # set numbering to chipset type
 GPIO.setmode(GPIO.BCM)
@@ -94,7 +95,7 @@ def parse_ndef(ndef):
         service = 'spop'
         command = tagPlayInfo['url']
 
-    fullCommandPath = mpd_music_library_path + 'd/' + command
+    fullCommandPath = mpd_music_library_path + command
     if os.path.isdir(fullCommandPath) or os.path.isfile(fullCommandPath):
         if service == 'mpd':
             playViaMPD(command)
@@ -103,7 +104,7 @@ def parse_ndef(ndef):
     else:
         mpc_output = subprocess.check_output(['mpc', 'pause'])
         time.sleep(0.5)
-        subprocess.call('mpg123 -q sounds/not_found.mp3', shell=True)
+        subprocess.call('mpg123 -q ' + os.path.dirname(os.path.abspath(__file__)) + '/sounds/not_found.mp3', shell=True)
         time.sleep(0.5)
         mpc_output = subprocess.check_output(['mpc', 'play'])
 
@@ -116,6 +117,41 @@ GPIO.add_event_detect(INPUT_button_prev, GPIO.RISING, callback=prev, bouncetime=
 # Initially set playing LED
 GPIO.output(OUTPUT_led_playing, is_mpd_currently_playing())
 
+# Write a Tag (via web app interface)
+app = Bottle()
+
+def path_to_dict(path):
+    name = os.path.basename(path)
+    d = {'text': name}
+    if os.path.isdir(path):
+        d['type'] = "folder"
+        d['children'] = [path_to_dict(os.path.join(path,x)) for x in os.listdir(path)]
+    else:
+        if os.path.isfile(path) and name.lower().endswith(('.mp3')) and not name.lower().startswith(('.')):
+            d['type'] = "file"
+        else:
+            d['li_attr'] = { "style": "display: none;" }
+            
+    return d
+
+@app.get('/')
+def show_interface():
+    sources = ['usb', 'spotify']
+    tree = json.dumps(path_to_dict(mpd_music_library_path + '/USB'), sort_keys=True)
+    return template('writetag-server/index.tpl', sources=sources, tree=tree)
+
+@app.post('/')
+def write_tag():
+    username = request.forms.get('username')
+    password = request.forms.get('password')
+    if username and password:
+        return "<p>Your login information was correct.</p>"
+    else:
+        return "<p>Login failed.</p>"
+
+app.run(host = '192.168.188.36', port = '8080')
+
+# Read a Tag
 reader = nfctest.ReadWriteTag()
 reader.on("ndef_data_read", parse_ndef)
 
