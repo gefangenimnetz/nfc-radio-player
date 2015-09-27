@@ -357,7 +357,8 @@ class Device(pn53x.Device):
 
 def init(transport):
     if transport.TYPE == "TTY":
-        baudrate = 115200 # PN532 initial baudrate
+        transport.write(bytearray([0x55, 0x55] + 14 * [0x00]))
+	baudrate = 115200 # PN532 initial baudrate
         transport.open(transport.port, baudrate)
         long_preamble = bytearray(10)
         get_version_cmd = bytearray.fromhex("0000ff02fed4022a00")
