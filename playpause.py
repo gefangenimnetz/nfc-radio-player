@@ -142,10 +142,10 @@ def show_interface():
 
 @app.post('/')
 def write_tag():
-    username = request.forms.get('username')
-    password = request.forms.get('password')
-    if username and password:
-        return "<p>Your login information was correct.</p>"
+    source = request.forms.get('source')
+    url = request.forms.get('url')
+    if source and url:
+        return "<p>You selected %s and %s</p>" % (source, url)
     else:
         return "<p>Login failed.</p>"
 

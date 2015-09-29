@@ -13,38 +13,44 @@
         <script src="//cdnjs.cloudflare.com/ajax/libs/jstree/3.0.9/jstree.min.js"></script>
     </head>
     <body>
-        <form method="POST" action="/" class="pure-form pure-form-aligned">
+        <form method="post" action="/" class="pure-form pure-form-aligned">
             <fieldset>
                 <div class="pure-control-group">
                     <label for="source">Source:</label>
                     <select name="source">
                         % for source in sources:
-                            <option value="option">{{source}}</option>
+                            <option name="source" value="{{source}}">{{source}}</option>
                         % end
                     </select>
                 </div>
                 <div class="pure-control-group">
                     <label for="source">Select file or folder:</label>
+                    <input type="hidden"name="url" value=""/>
                     <div id="url_select_tree"></div>
                     <script>
                         $(function() {
                             $('#url_select_tree').jstree({
                                 "core": {
-                                    "data": [{{!tree}}]
+                                    "data": [{{!tree}}],
+                                    "multiple" : false
                                 },
                                 "types" : {
                                     "folder" : {
-                                      "icon" : "fa fa-folder"
+                                        "icon" : "fa fa-folder"
                                     },
                                     "file" : {
-                                      "icon" : "fa fa-file-audio-o"
+                                        "icon" : "fa fa-file-audio-o"
                                     }
-                                  },
-                                  "plugins" : ["types", "sort"]
+                                },
+                                "plugins" : ["types", "sort"]
+                            });
+                            $('#url_select_tree').on("changed.jstree", function (e, data) {
+                                document.forms[0].url.value = data.instance.get_path(data.node,'/');
                             });
                         });
                     </script>
                 </div>
+                <button type="submit">Write to tag</button>
             </fieldset>
         </form>
     </body>
