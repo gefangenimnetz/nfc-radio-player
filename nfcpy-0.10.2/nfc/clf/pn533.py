@@ -19,24 +19,11 @@
 # See the Licence for the specific language governing
 # permissions and limitations under the Licence.
 # -----------------------------------------------------------------------------
-"""Driver module for contactless devices based on the NXP PN532
-chipset. This successor of the PN531 can additionally handle Type B
-Technology (type 4B Tags) and Type 1 Tag communication. It also
-supports an extended frame syntax for host communication that allows
-larger packets to be transferred. The chip has selectable UART, I2C or
-SPI host interfaces. A speciality of the PN532 is that it can manage
-two targets (cards) simultanously, although this is not used by
-*nfcpy*.
-
-The internal chipset architecture comprises a small 8-bit MCU and a
-Contactless Interface Unit CIU that is basically a PN512. The CIU
-implements the analog and digital part of communication (modulation
-and framing) while the MCU handles the protocol parts and host
-communication. Almost all PN532 firmware limitations (or bugs) can be
-avoided by directly programming the CIU. Type F Target mode for card
-emulation is completely implemented with the CIU and limited to 64
-byte frame exchanges by the CIU's FIFO size. Type B Target mode is not
-possible.
+"""Driver module for contactless devices based on the NXP PN533
+chipset. The PN533 is pretty similar to the PN532 except that it also
+has a USB host interface option and, probably due to the resources
+needed for USB, does not support two simultaneous targets. Anything
+else said about PN532 also applies to PN533.
 
 ==========  =======  ============
 function    support  remarks
@@ -55,8 +42,6 @@ listen_dep  yes
 import logging
 log = logging.getLogger(__name__)
 
-import os
-import sys
 import time
 import errno
 from binascii import hexlify
@@ -74,11 +59,9 @@ class Chipset(pn53x.Chipset):
         0x08: "WriteRegister",
         0x0C: "ReadGPIO",
         0x0E: "WriteGPIO",
-        0x10: "SetSerialBaudrate",
         0x12: "SetParameters",
-        0x14: "SAMConfiguration",
-        0x16: "PowerDown",
-        # RF communication
+        0x18: "AlparCommandForTDA",
+        # RF Communication
         0x32: "RFConfiguration",
         0x58: "RFRegulationTest",
         # Initiator
@@ -89,16 +72,19 @@ class Chipset(pn53x.Chipset):
         0x4E: "InPSL",
         0x40: "InDataExchange",
         0x42: "InCommunicateThru",
+        0x38: "InQuartetByteExchange",
         0x44: "InDeselect",
         0x52: "InRelease",
         0x54: "InSelect",
-        0x60: "InAutoPoll",
-        # Target
+        0x48: "InActivateDeactivatePaypass",
+        # Target 
         0x8C: "TgInitAsTarget",
         0x92: "TgSetGeneralBytes",
         0x86: "TgGetData",
         0x8E: "TgSetData",
+        0x96: "TgSetDataSecure",
         0x94: "TgSetMetaData",
+        0x98: "TgSetMetaDataSecure",
         0x88: "TgGetInitiatorCommand",
         0x90: "TgResponseToInitiator",
         0x8A: "TgGetTargetStatus",
@@ -108,7 +94,7 @@ class Chipset(pn53x.Chipset):
         0x02: "Checksum error during RF communication",
         0x03: "Parity error during RF communication",
         0x04: "Erroneous bit count in anticollision",
-        0x05: "Framing error during Mifare operation",
+        0x05: "Framing error during mifare operation",
         0x06: "Abnormal bit collision in 106 kbps anticollision",
         0x07: "Insufficient communication buffer size",
         0x09: "RF buffer overflow detected by CIU",
@@ -120,10 +106,12 @@ class Chipset(pn53x.Chipset):
         0x12: "Unsupported command from Initiator",
         0x13: "Format error during RF communication",
         0x14: "Mifare authentication error",
+        0x18: "Target or Initiator does not support NFC Secure",
+        0x19: "I2C bus line is busy, a TDA transaction is ongoing",
         0x23: "ISO/IEC14443-3 UID check byte is wrong",
         0x25: "Command invalid in current DEP state",
         0x26: "Operation not allowed in this configuration",
-        0x27: "Command is not acceptable in the current context",
+        0x27: "Command is not acceptable due to the current context",
         0x29: "Released by Initiator while operating as Target",
         0x2A: "ISO/IEC14443-3B, the ID of the card does not match",
         0x2B: "ISO/IEC14443-3B, card previously activated has disappeared",
@@ -135,59 +123,43 @@ class Chipset(pn53x.Chipset):
     }
 
     host_command_frame_max_size = 265
-    in_list_passive_target_max_target = 2
-    in_list_passive_target_brty_range = (0, 1, 2, 3, 4)
+    in_list_passive_target_max_target = 1
+    in_list_passive_target_brty_range = (0, 1, 2, 3, 4, 6, 7, 8)
+
+    def get_general_status(self):
+        data = super(Chipset, self).get_general_status()
+        err = self.ERR.get(data[0], "error code 0x%02X" % data[0])
+        field = ("", "external field detected")[data[1]]
+        if data[2] == 1:
+            br_rx = (106, 212, 424, 848)[data[4]]
+            br_tx = (106, 212, 424, 848)[data[5]]
+            mtype = {0:"A/B", 1:"Active", 2:"Jewel", 16:"FeliCa"}[data[6]]
+            return err, field, (data[3], br_rx, br_tx, mtype)
+        else:
+            return err, field, None
 
     def _read_register(self, data):
-        return self.command(0x06, data, timeout=0.25)
+        data = self.command(0x06, data, timeout=0.25)
+        if data[0] != 0: self.chipset_error(data)
+        return data[1:]
 
     def _write_register(self, data):
-        self.command(0x08, data, timeout=0.25)
-        
-    def set_serial_baudrate(self, baudrate):
-        br = (9600,19200,38400,57600,115200,230400,460800,921600,1288000)
-        self.command(0x10, chr(br.index(baudrate)), timeout=0.1)
-        self.write_frame(self.ACK)
-
-    def sam_configuration(self, mode, timeout=0, irq=False):
-        mode = ("normal", "virtual", "wired", "dual").index(mode) + 1
-        self.command(0x14, bytearray([mode, timeout, int(irq)]), timeout=0.1)
-
-    power_down_wakeup_src = ("INT0","INT1","rfu","RF","HSU","SPI","GPIO","I2C")
-    def power_down(self, wakeup_enable, generate_irq=False):
-        wakeup_set = 0
-        for i, src in enumerate(self.power_down_wakeup_src):
-            if src in wakeup_enable: wakeup_set |= 1 << i
-        cmd_data = bytearray([wakeup_set, int(generate_irq)])
-        data = self.command(0x16, cmd_data, timeout=0.1)
+        data = self.command(0x08, data, timeout=0.25)
         if data[0] != 0: self.chipset_error(data)
-
-    def in_auto_poll(self, poll_nr, period, *types):
-        assert len(types) <= 15
-        timeout = poll_nr * len(types) * period * 0.15 + 0.1
-        data = chr(poll_nr) + chr(period) + bytearray(types)
-        data = self.command(0x60, data, timeout=timeout)
-        targets = []
-        for i in data.pop(0):
-            tg_type = data.pop(0)
-            tg_data = data[:data.pop(0)]
-            targets.append((tg_type, tg_data))
-        return targets
-
-    def tg_init_as_target(self, mode, mifare_params, felica_params, nfcid3t,
-                          general_bytes='', historical_bytes='', timeout=None):
-        assert type(mode) is int and mode & 0b11111000 == 0
+        
+    def tg_init_as_target(self, mode, mifare_params, felica_params,
+                          nfcid3t, gt, tk, timeout):
+        assert type(mode) is int and mode & 0b11111100 == 0
         assert len(mifare_params) == 6
         assert len(felica_params) == 18
         assert len(nfcid3t) == 10
 
         data = (chr(mode) + mifare_params + felica_params + nfcid3t +
-                chr(len(general_bytes)) + general_bytes +
-                chr(len(historical_bytes)) + historical_bytes)
+                chr(len(gt)) + gt + chr(len(tk)) + tk)
         return self.command(0x8c, data, timeout)
 
 class Device(pn53x.Device):
-    # Device driver for PN532 based contactless frontends.
+    # Device driver for PN533 based contactless frontends.
 
     def __init__(self, chipset, logger):
         assert isinstance(chipset, Chipset)
@@ -196,58 +168,81 @@ class Device(pn53x.Device):
         ic, ver, rev, support = self.chipset.get_firmware_version()
         self._chipset_name = "PN5{0:02x}v{1}.{2}".format(ic, ver, rev)
         self.log.debug("chipset is a {0}".format(self._chipset_name))
-
-        self.chipset.sam_configuration("normal")
-        self.chipset.set_parameters(0b00000000)
+        
+        self.mute()
         self.chipset.rf_configuration(0x02, "\x00\x0B\x0A")
         self.chipset.rf_configuration(0x04, "\x00")
         self.chipset.rf_configuration(0x05, "\x01\x00\x01")
-        
-        # The default value of CIU_ModGsP does not work with the Texas
-        # Instruments RF430CL330H Type B NFC Interface Transponder. It
-        # works when setting ModGsP to 0x10.
-        self.log.debug("write analog settings for type B")
-        self.chipset.rf_configuration(0x0C, "\xFF\x10\x85") # ModGsP
-        
-        self.mute()
+        self.chipset.set_parameters(0b00000000)
 
+        self.eeprom = bytearray()
+        try:
+            self.chipset.read_register(0xA000) # check access
+            for addr in range(0xA000, 0xA100, 64):
+                data = self.chipset.read_register(*range(addr, addr+64))
+                self.eeprom.extend(data)
+        except Chipset.Error:
+            self.log.debug("no eeprom attached")
+
+        if self.eeprom:
+            head = "EEPROM  " + ' '.join(["%2X" % i for i in range(16)])
+            self.log.debug(head)
+            for i in range(0, len(self.eeprom), 16):
+                data = ' '.join(["%02X" % x for x in self.eeprom[i:i+16]])
+                self.log.debug(('0x%04X: %s' % (0xA000+i, data)))
+        else:
+            # Write default RF settings from PN533 data sheet. Looks
+            # like they are not the same if there is no eeprom
+            # attached, least CIU_RFCfg register for 106A is different
+            # and prevents active mode initialization as target.
+            self.log.debug("no eeprom attached")
+            
+            self.log.debug("write analog settings for Type A")
+            data = bytearray.fromhex("5A F4 3F 11 4D 85 61 6F 26 62 87")
+            self.chipset.rf_configuration(0x0A, data)
+            
+            #self.log.debug("write rf settings for 212F/424F")
+            #data = bytearray.fromhex("6A FF 3F 11 41 85 61 6F")
+            #self.chipset.rf_configuration(0x0B, data)
+            
+            #self.log.debug("write rf settings for 106B")
+            #data = bytearray.fromhex("FF 17 85") # ModGsP set differently
+            #self.chipset.rf_configuration(0x0C, data)
+            
+            #self.log.debug("write rf settings for 212A/424A/848A")
+            #data = bytearray.fromhex("85 15 8A 85 0A B2 85 04 DA")
+            #self.chipset.rf_configuration(0x0D, data)
+            
     def close(self):
-        if self.chipset.transport.TYPE == "TTY":
-            self.chipset.set_serial_baudrate(115200)
-            self.chipset.transport.baudrate = 115200
-            time.sleep(0.001)
-        
-        self.chipset.power_down(wakeup_enable=("I2C", "SPI", "HSU"))
+        self.mute()
         super(Device, self).close()
 
     def sense_tta(self, target):
-        """Search for a Type A Target.
+        """Activate the RF field and probe for a Type A Target.
 
-        The PN532 can discover all kinds of Type A Targets (Type 1
+        The PN533 can discover all kinds of Type A Targets (Type 1
         Tag, Type 2 Tag, and Type 4A Tag) at 106 kbps.
 
         """
         return super(Device, self).sense_tta(target)
 
     def sense_ttb(self, target):
-        """Search for a Type B Target.
+        """Activate the RF field and probe for a Type B Target.
 
-        The PN532 can discover Type B Targets (Type 4B Tag) at 106
-        kbps. For a Type 4B Tag the firmware automatically sends an
-        ATTRIB command that configures the use of DID and 64 byte
-        maximum frame size. The driver reverts this configuration with
-        a DESELECT and WUPB command to return the target prepared for
-        activation (which nfcpy does in the tag activation code).
+        The PN533 can discover Type B Targets (Type 4B Tag) at 106,
+        212, 424, and 848 kbps. The PN533 automatically sends an
+        ATTRIB command that configures a 64 byte maximum frame
+        size. The driver reverts this configuration with a DESELECT
+        and WUPB command to return the target prepared for activation.
 
         """
-        return super(Device, self).sense_ttb(target, did='\x01')
+        return super(Device, self).sense_ttb(target)
     
     def sense_ttf(self, target):
-        """Search for a Type F Target.
+        """Activate the RF field and probe for a Type F Target.
 
-        The PN532 can discover Type F Targets (Type 3 Tag) at 212 and
-        424 kbps. The driver uses the default polling command
-        ``06FFFF0000`` if no ``target.sens_req`` is supplied.
+        The PN533 can discover Type F Targets (Type 3 Tag) at 212 and
+        424 kbps.
 
         """
         return super(Device, self).sense_ttf(target)
@@ -255,12 +250,20 @@ class Device(pn53x.Device):
     def sense_dep(self, target):
         """Search for a DEP Target in active communication mode."""
         return super(Device, self).sense_dep(target)
-        
+
+    def send_cmd_recv_rsp(self, target, data, timeout):
+        """Send command *data* to the remote *target* and return the response
+        data if received within *timeout* seconds.
+
+        """
+        return super(Device, self).send_cmd_recv_rsp(target, data, timeout)
+
     def _tt1_send_cmd_recv_rsp(self, data, timeout):
         # Special handling for Tag Type 1 (Jewel/Topaz) card commands.
         
         if data[0] in (0x00, 0x01, 0x1A, 0x53, 0x72):
-            # These commands are implemented by the chipset.
+            # RALL, READ, WRITE-NE, WRITE-E, RID are properly
+            # implemented by the PN533 firmware.
             return self.chipset.in_data_exchange(data, timeout)[0]
 
         if data[0] == 0x10:
@@ -278,31 +281,36 @@ class Device(pn53x.Device):
         # implemented by the chipset. Fortunately we can directly
         # program the CIU through register read/write. Each TT1
         # command byte must be send as a separate Type A frame, the
-        # first as a short frame with only 7 data bits and the others
-        # as normal frames. Reading is also a bit complicated because
+        # first is a short frame with only 7 data bits and the others
+        # are normal frames. Reading is also a bit complicated because
         # for sending we have to disable the parity generator which
         # means that we will also receive the parity bits, thus 9 bits
         # received per 8 data bits. And because they are already
         # reversed in the FIFO we must swap before parity removal and
-        # afterwards (maybe this could be optimized a bit)
+        # afterwards (maybe this could be a bit more optimized).
         data = self.add_crc_b(data)
-        register_write = []
-        register_write.append(("CIU_FIFOData",   data[0])) # CMD_CODE
-        register_write.append(("CIU_BitFraming",    0x07)) # 7 bits
-        register_write.append(("CIU_Command",       0x04)) # Transmit
-        register_write.append(("CIU_BitFraming",    0x00)) # 8 bits
-        register_write.append(("CIU_ManualRCV",     0x30)) # ParityDisable
-        for i in range(1, len(data)):
-            register_write.append(("CIU_FIFOData", data[i])) # CMD_DATA
-            register_write.append(("CIU_Command",     0x04)) # Transmit
-            register_write.append(("CIU_Command",     0x07)) # NoCmdChange
-        register_write.append(("CIU_Command",       0x08)) # Receive
-        self.chipset.write_register(*register_write)
+        self.chipset.write_register(
+            ("CIU_FIFOData", data[0]), # CMD_CODE
+            ("CIU_ManualRCV",  0x10),  # ParityDisable
+            ("CIU_BitFraming", 0x07),  # 7 bits
+            ("CIU_Command",    0x04),  # Transmit
+        )
+        for i in range(1, len(data)-1):
+            self.chipset.write_register(
+                ("CIU_FIFOData", data[i]), # CMD_DATA
+                ("CIU_BitFraming", 0x00),  # 8 bits
+                ("CIU_Command",    0x04),  # Transmit
+            )
+        self.chipset.write_register(
+            ("CIU_FIFOData", data[-1]), # CMD_DATA
+            ("CIU_Command",    0x0C),   # Transceive
+            ("CIU_BitFraming", 0x80),   # 8 bits, start send
+        )
         if data[0] == 0x54: # WRITE-E8
             time.sleep(0.006) # assuming same response time as WRITE-E
         if data[0] == 0x1B: # WRITE-NE8
             time.sleep(0.003) # assuming same response time as WRITE-NE
-        self.chipset.write_register(("CIU_ManualRCV", 0x20)) # enable parity
+        self.chipset.write_register(("CIU_ManualRCV", 0x00)) # enable parity
         fifo_level = self.chipset.read_register("CIU_FIFOLevel")
         if fifo_level == 0: raise nfc.clf.TimeoutError
         data = self.chipset.read_register(*(fifo_level * ["CIU_FIFOData"]))
@@ -310,7 +318,7 @@ class Device(pn53x.Device):
         data = [int(data[i:i+8][::-1], 2) for i in range(0, len(data)-8, 9)]
         if self.check_crc_b(data) is False:
             raise nfc.clf.TransmissionError("crc_b check error")
-        return bytearray(data[0:-2])
+        return bytearray(data[:-2])
 
     def listen_tta(self, target, timeout):
         """Listen *timeout* seconds for a Type A activation at 106 kbps. The
@@ -344,11 +352,19 @@ class Device(pn53x.Device):
     def listen_dep(self, target, timeout):
         """Listen *timeout* seconds to become initialized as a DEP Target.
         
-        The PN532 can be set to listen as a DEP Target for passive and
+        The PN533 can be set to listen as a DEP Target for passive and
         active communication mode.
 
         """
         return super(Device, self).listen_dep(target, timeout)
+
+    def send_rsp_recv_cmd(self, target, data, timeout):
+        """While operating as *target* send response *data* to the remote
+        device and return new command data if received within
+        *timeout* seconds.
+
+        """
+        return super(Device, self).send_rsp_recv_cmd(target, data, timeout)
 
     def _init_as_target(self, mode, tta_params, ttf_params, timeout):
         nfcid3t = ttf_params[0:8] + "\x00\x00"
@@ -356,36 +372,28 @@ class Device(pn53x.Device):
         return self.chipset.tg_init_as_target(*args)
 
 def init(transport):
-    if transport.TYPE == "TTY":
-        baudrate = 115200 # PN532 initial baudrate
-        transport.open(transport.port, baudrate)
-        long_preamble = bytearray(10)
-        get_version_cmd = bytearray.fromhex("0000ff02fed4022a00")
-        get_version_rsp = bytearray.fromhex("0000ff06fad50332")
-        transport.write(long_preamble + get_version_cmd)
-        if (transport.read(timeout=100) == Chipset.ACK and
-            transport.read(timeout=100).startswith(get_version_rsp)):
-            if sys.platform.startswith("linux"):
-                stty = 'stty -F %s %%d 2> /dev/null' % transport.port
-                for baudrate in (921600, 460800, 230400, 115200):
-                    log.debug("trying to set %d baud", baudrate) #continue
-                    if os.system(stty % baudrate) == 0:
-                        os.system(stty % 115200); break
-            if baudrate > 115200:
-                set_baudrate_cmd = bytearray.fromhex("0000ff03fdd410000000")
-                set_baudrate_rsp = bytearray.fromhex("0000ff02fed5111a00")
-                set_baudrate_cmd[7] = 5+(230400,460800,921600).index(baudrate)
-                set_baudrate_cmd[8] = 256 - sum(set_baudrate_cmd[5:8])
-                transport.write(long_preamble + set_baudrate_cmd)
-                if (transport.read(timeout=100) == Chipset.ACK and
-                    transport.read(timeout=100) == set_baudrate_rsp):
-                    transport.write(Chipset.ACK)
-                    transport.open(transport.port, baudrate)
-                    log.debug("changed uart speed to %d baud", baudrate)
-                    time.sleep(0.001)
-                else: baudrate = 0
-            if baudrate > 0:
-                chipset = Chipset(transport, logger=log)
-                return Device(chipset, logger=log)
+    # write ack to perform a soft reset, raises IOError(EACCES) if
+    # someone else has already claimed the USB device.
+    transport.write(Chipset.ACK)
     
-    raise IOError(errno.ENODEV, os.strerror(errno.ENODEV))
+    chipset = Chipset(transport, logger=log)
+    device = Device(chipset, logger=log)
+    
+    # PN533 bug: usb manufacturer and product strings disappear
+    # from usb configuration after first use in p2p mode. Thus
+    # we'll try to read it directly from the EEPROM.
+    if device.eeprom:
+        eeprom = device.eeprom; index = 0
+        while index < len(eeprom) and eeprom[index] != 0xFF:
+            tlv_tag, tlv_len = eeprom[index], eeprom[index+1]
+            tlv_data = eeprom[index+2:index+2+tlv_len]
+            if tlv_tag == 3:
+                device._device_name = tlv_data[2:].decode("utf-16")
+            if tlv_tag == 4:
+                device._vendor_name = tlv_data[2:].decode("utf-16")
+            index += 2 + tlv_len
+    else:
+        device._vendor_name = "SensorID"
+        device._device_name = "StickID"
+
+    return device

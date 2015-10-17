@@ -1,6 +1,6 @@
 # -*- coding: latin-1 -*-
 # -----------------------------------------------------------------------------
-# Copyright 2009-2015 Stephen Tiedemann <stephen.tiedemann@googlemail.com>
+# Copyright 2012 Stephen Tiedemann <stephen.tiedemann@googlemail.com>
 #
 # Licensed under the EUPL, Version 1.1 or - as soon they 
 # will be approved by the European Commission - subsequent
@@ -19,10 +19,21 @@
 # See the Licence for the specific language governing
 # permissions and limitations under the Licence.
 # -----------------------------------------------------------------------------
-__version__ = "0.10.2"
 
-import logging
-logging.getLogger(__name__).addHandler(logging.NullHandler())
-logging.getLogger(__name__).setLevel(logging.INFO)
+class FormatError(Exception):
+    """NDEF Record structure error"""
+    pass
 
-from clf import ContactlessFrontend
+class LengthError(Exception):
+    """NDEF structure length error"""
+    pass
+
+class DecodeError(Exception):
+    """NDEF payload decode error"""
+    pass
+
+class EncodeError(Exception):
+    """NDEF payload encode error"""
+    pass
+
+parser_error = (FormatError, LengthError, DecodeError)

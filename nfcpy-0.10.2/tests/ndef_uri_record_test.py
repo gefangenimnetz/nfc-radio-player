@@ -1,6 +1,7 @@
+#!/usr/bin/python
 # -*- coding: latin-1 -*-
 # -----------------------------------------------------------------------------
-# Copyright 2009-2015 Stephen Tiedemann <stephen.tiedemann@googlemail.com>
+# Copyright 2012 Stephen Tiedemann <stephen.tiedemann@googlemail.com>
 #
 # Licensed under the EUPL, Version 1.1 or - as soon they 
 # will be approved by the European Commission - subsequent
@@ -19,10 +20,20 @@
 # See the Licence for the specific language governing
 # permissions and limitations under the Licence.
 # -----------------------------------------------------------------------------
-__version__ = "0.10.2"
+import sys, os
+sys.path.insert(1, os.path.split(sys.path[0])[0])
 
-import logging
-logging.getLogger(__name__).addHandler(logging.NullHandler())
-logging.getLogger(__name__).setLevel(logging.INFO)
+import nfc.ndef
 
-from clf import ContactlessFrontend
+def test_init_args_none():
+    record = nfc.ndef.UriRecord()
+    assert record.uri == ''
+    
+def test_init_args_uri():
+    record = nfc.ndef.UriRecord("http://nfcpy.org")
+    assert record.uri == "http://nfcpy.org"
+    
+def test_init_kwargs_uri():
+    record = nfc.ndef.UriRecord(uri="http://nfcpy.org")
+    assert record.uri == "http://nfcpy.org"
+    

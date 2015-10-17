@@ -1,6 +1,6 @@
 # -*- coding: latin-1 -*-
 # -----------------------------------------------------------------------------
-# Copyright 2009-2015 Stephen Tiedemann <stephen.tiedemann@googlemail.com>
+# Copyright 2009-2011 Stephen Tiedemann <stephen.tiedemann@googlemail.com>
 #
 # Licensed under the EUPL, Version 1.1 or - as soon they 
 # will be approved by the European Commission - subsequent
@@ -19,10 +19,25 @@
 # See the Licence for the specific language governing
 # permissions and limitations under the Licence.
 # -----------------------------------------------------------------------------
-__version__ = "0.10.2"
 
-import logging
-logging.getLogger(__name__).addHandler(logging.NullHandler())
-logging.getLogger(__name__).setLevel(logging.INFO)
+from os import strerror
+import errno
 
-from clf import ContactlessFrontend
+class Error(IOError):
+    def __init__(self, errno):
+        super(Error, self).__init__(errno, strerror(errno))
+
+    def __str__(self):
+        return "nfc.llcp.Error: [{0}] {1}".format(
+            errno.errorcode[self.errno], self.strerror)
+
+class ConnectRefused(Error):
+    def __init__(self, reason):
+        super(ConnectRefused, self).__init__(errno.ECONNREFUSED)
+        self.reason = reason
+
+    def __str__(self):
+        return "nfc.llcp.ConnectRefused: [{0}] {1} with reason {2}".format(
+            errno.errorcode[self.errno], self.strerror, self.reason)
+
+    

@@ -1,6 +1,6 @@
 # -*- coding: latin-1 -*-
 # -----------------------------------------------------------------------------
-# Copyright 2009-2015 Stephen Tiedemann <stephen.tiedemann@googlemail.com>
+# Copyright 2012 Stephen Tiedemann <stephen.tiedemann@googlemail.com>
 #
 # Licensed under the EUPL, Version 1.1 or - as soon they 
 # will be approved by the European Commission - subsequent
@@ -19,10 +19,13 @@
 # See the Licence for the specific language governing
 # permissions and limitations under the Licence.
 # -----------------------------------------------------------------------------
-__version__ = "0.10.2"
 
-import logging
-logging.getLogger(__name__).addHandler(logging.NullHandler())
-logging.getLogger(__name__).setLevel(logging.INFO)
+"""
+The nfc.handover module implements the NFC Forum Connection Handover
+1.2 protocol as a server and client class that simplify realization of
+handover selector and requester functionality.
 
-from clf import ContactlessFrontend
+"""
+
+from nfc.handover.server import HandoverServer
+from nfc.handover.client import HandoverClient

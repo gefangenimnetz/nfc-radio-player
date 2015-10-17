@@ -149,7 +149,7 @@ def write_tag():
     else:
         return "<p>Login failed.</p>"
 
-app.run(host = '192.168.188.36', port = '8080')
+# app.run(host = '192.168.188.36', port = '8080')
 
 # Read a Tag
 reader = nfctest.ReadWriteTag()
